@@ -53,7 +53,7 @@ else
 fi
 
 if [ ! -e "${folder_path}/hcloud-image-snapshots.pkr.hcl" ]; then
-    curl -sL https://raw.githubusercontent.com/kube-hetzner/terraform-hcloud-kube-hetzner/master/packer-template/hcloud-microos-snapshots.pkr.hcl -o "${folder_path}/hcloud-image-snapshots.pkr.hcl"
+    curl -sL https://raw.githubusercontent.com/akoua/k8s-hetzner-initializer/refs/heads/main/hcloud-rocky-linux-image-snapshots.pkr.hcl -o "${folder_path}/hcloud-image-snapshots.pkr.hcl"
 else
     echo "hcloud-image-snapshots.pkr.hcl already exists. Skipping download."
 fi
