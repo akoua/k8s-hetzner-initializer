@@ -17,16 +17,16 @@ variable "hcloud_token" {
 }
 
 # We download the OpenSUSE MicroOS x86 image from an automatically selected mirror.
-# variable "opensuse_microos_x86_mirror_link" {
-#   type    = string
-#   default = "https://download.opensuse.org/tumbleweed/appliances/openSUSE-MicroOS.x86_64-ContainerHost-OpenStack-Cloud.qcow2"
-# }
+variable "rocky_9_x86_mirror_link" {
+  type    = string
+  default = "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+}
 
 # We download the OpenSUSE MicroOS ARM image from an automatically selected mirror.
-# variable "opensuse_microos_arm_mirror_link" {
-#   type    = string
-#   default = "https://download.opensuse.org/ports/aarch64/tumbleweed/appliances/openSUSE-MicroOS.aarch64-ContainerHost-OpenStack-Cloud.qcow2"
-# }
+variable "rocky_9_arm_mirror_link" {
+  type    = string
+  default = "https://dl.rockylinux.org/pub/rocky/9/images/aarch64/Rocky-9-GenericCloud-Base.latest.aarch64.qcow2"
+}
 
 # If you need to add other packages to the OS, do it here in the default value, like ["vim", "curl", "wget"]
 # When looking for packages, you need to search for OpenSUSE Tumbleweed packages, as MicroOS is based on Tumbleweed.
@@ -37,34 +37,32 @@ variable "packages_to_install" {
 
 locals {
   #open-iscsi nfs-client I replace them
-  needed_packages = join(" ", concat(["policycoreutils-restorecond policycoreutils policycoreutils-python-utils setools-console audit bind-utils wireguard-tools fuse xfsprogs cryptsetup lvm2 git cifs-utils bash-completion mtr tcpdump iscsi-initiator-utils nfs-utils python3-dnf-plugin-versionlock.noarch rpm-ostree"], var.packages_to_install))
+  needed_packages = join(" ", concat(["policycoreutils-restorecond policycoreutils policycoreutils-python-utils setools-console audit bind-utils wireguard-tools fuse xfsprogs cryptsetup lvm2 git cifs-utils bash-completion mtr tcpdump iscsi-initiator-utils nfs-utils python3-dnf-plugin-versionlock.noarch"], var.packages_to_install))
 
   # Add local variables for inline shell commands
   download_image = "wget --timeout=5 --waitretry=5 --tries=5 --retry-connrefused --inet4-only "
 
-  # write_image = <<-EOT
-  #   set -ex
-  #   echo 'MicroOS image loaded, writing to disk... '
-  #   qemu-img convert -p -f qcow2 -O host_device $(ls -a | grep -ie '^opensuse.*microos.*qcow2$') /dev/sda
-  #   echo 'done. Rebooting...'
-  #   sleep 1 && udevadm settle && reboot
-  # EOT
+  write_image = <<-EOT
+    set -ex
+    echo 'Rocky image loaded, writing to disk... '
+    qemu-img convert -p -f qcow2 -O host_device $(ls -a | grep -ie '^rocky.*qcow2$') /dev/sda
+    echo 'done. Rebooting...'
+    sleep 1 && udevadm settle && reboot
+  EOT
 
   install_packages = <<-EOT
     set -ex
-    echo "First reboot successful, installing needed packages..."
+    echo "First reboot successful, installing needed packages..."    
     dnf install -y epel-release
     dnf update -y
-    dnf install -y ${local.needed_packages}
-    dnf --setopt=protected_packages= --shell <<- EOF
+    dnf install -y ${local.needed_packages}    
     setenforce 0
     rpm --import https://rpm.rancher.io/public.key
-    dnf install -y https://github.com/k3s-io/k3s-selinux/releases/download/v1.6.stable.1/k3s-selinux-1.6-1.sle.noarch.rpm
+    dnf install -y https://github.com/k3s-io/k3s-selinux/releases/download/v1.6.stable.1/k3s-selinux-1.6-1.el9.noarch.rpm
     dnf versionlock add k3s-selinux
     restorecon -Rv /etc/selinux/targeted/policy
     restorecon -Rv /var/lib
-    setenforce 1
-    EOF
+    setenforce 1    
     sleep 1 && udevadm settle && reboot
   EOT
 
@@ -85,7 +83,7 @@ source "hcloud" "rockylinux-x86" {
   location    = "nbg1"
   server_type = "cx22" # disk size of >= 40GiB is needed to install the MicroOS image
   snapshot_labels = {
-    microos-snapshot = "no"
+    rocky-snapshot   = "yes"
     creator          = "kube-hetzner"
   }
   snapshot_name = "RockyLinux 9 x86 by Kube-Hetzner"
@@ -100,7 +98,7 @@ source "hcloud" "rockylinux-arm" {
   location    = "nbg1"
   server_type = "cax11" # disk size of >= 40GiB is needed to install the MicroOS image
   snapshot_labels = {
-    microos-snapshot = "no"
+    rocky-snapshot   = "yes"
     creator          = "kube-hetzner"
   }
   snapshot_name = "RockyLinux 9 ARM by Kube-Hetzner"
@@ -113,15 +111,15 @@ build {
   sources = ["source.hcloud.rockylinux-x86"]
 
   # Download the MicroOS x86 image
-  # provisioner "shell" {
-  #   inline = ["${local.download_image}${var.opensuse_microos_x86_mirror_link}"]
-  # }
+  provisioner "shell" {
+    inline = ["${local.download_image}${var.rocky_9_x86_mirror_link}"]
+  }
 
   # Write the MicroOS x86 image to disk
-  # provisioner "shell" {
-  #   inline            = [local.write_image]
-  #   expect_disconnect = true
-  # }
+  provisioner "shell" {
+    inline            = [local.write_image]
+    expect_disconnect = true
+  }
 
   # Ensure connection to MicroOS x86 and do house-keeping
   provisioner "shell" {
@@ -142,15 +140,15 @@ build {
   sources = ["source.hcloud.rockylinux-arm"]
 
   # # Download the MicroOS ARM image
-  # provisioner "shell" {
-  #   inline = ["${local.download_image}${var.opensuse_microos_arm_mirror_link}"]
-  # }
+  provisioner "shell" {
+    inline = ["${local.download_image}${var.rocky_9_arm_mirror_link}"]
+  }
 
-  # # Write the MicroOS ARM image to disk
-  # provisioner "shell" {
-  #   inline            = [local.write_image]
-  #   expect_disconnect = true
-  # }
+  # Write the MicroOS ARM image to disk
+  provisioner "shell" {
+    inline            = [local.write_image]
+    expect_disconnect = true
+  }
 
   # Ensure connection to MicroOS ARM and do house-keeping
   provisioner "shell" {
